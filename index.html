@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>AftOS</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: sans-serif;
+      background: url('wallpaper.png') no-repeat center center fixed;
+      background-size: cover;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+    }
+    #start-button {
+      background-color: #555;
+      color: #fff;
+      border: none;
+      padding: 15px 30px;
+      font-size: 20px;
+      cursor: pointer;
+      border-radius: 10px;
+      transition: background-color 0.3s;
+      z-index: 1000;
+      position: absolute;
+      top: 50%; left: 50%; transform: translate(-50%, -50%);
+    }
+    #start-button:hover { background-color: #777; }
+    #taskbar {
+      background-color: #333;
+      padding: 15px;
+      position: fixed;
+      bottom: 0; width: 100%; display: flex; gap: 10px;
+      z-index: 1000; display: none;
+    }
+    #desktop {
+      position: relative;
+      width: 100vw;
+      height: calc(100vh - 100px);
+      overflow: hidden; display: none;
+      background-image: radial-gradient(circle at 0 0, #222 1px, transparent 2px);
+      background-size: 20px 20px;
+    }
+    .window {
+      background: #444; border: 1px solid #666;
+      position: absolute; width: 400px; height: 300px;
+      top: 50px; left: 50px;
+      display: flex; flex-direction: column;
+      resize: both; overflow: hidden; z-index: 10;
+    }
+    .window-header {
+      background: #222; padding: 5px;
+      cursor: move; display: flex;
+      justify-content: space-between; color: #fff;
+    }
+    .window-body {
+      flex: 1; background: #111;
+      padding: 10px; overflow: auto;
+      transition: background 0.4s, color 0.4s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .window-body.light-mode {
+      background: #f4f4f4;
+      color: #000;
+    }
+    textarea, input[type="text"] {
+      width: 100%; background: #222;
+      color: white; border: none; box-sizing: border-box;
+    }
+    input[type="text"] {
+      font-size: 18px; margin-bottom: 5px;
+    }
+    .window-body.light-mode input,
+    .window-body.light-mode button {
+      background: #e0e0e0;
+      color: #000;
+    }
+    button.app-btn {
+      margin: 2px; background: #555; color: #fff;
+      border: none; cursor: pointer;
+    }
+    button.app-btn:hover { background: #777; }
+    iframe { width: 100%; height: 100%; border: none; }
+
+    /* Snake canvas styling */
+    #snakeCanvas {
+      background-color: black;
+      display: block;
+      margin: 0 auto;
+      image-rendering: pixelated;
+      border: 2px solid #666;
+      outline: none;
+    }
+  </style>
+</head>
+<body>
+  <button id="start-button">I aren't a robot.</button>
+  <div id="taskbar">
+    <button class="app-btn" id="notepadBtn">📝 Notepad</button>
+    <button class="app-btn" id="calculatorBtn">🧮 Calculator</button>
+    <button class="app-btn" id="browserBtn">🌐 Browser</button>
+    <button class="app-btn" id="snakeBtn">🐍 Snake</button>
+  </div>
+  <div id="desktop"></div>
+
+  <script>
+    const startBtn = document.getElementById('start-button');
+    const taskbar = document.getElementById('taskbar');
+    const desktop = document.getElementById('desktop');
+
+    startBtn.addEventListener('click', () => {
+      const elem = document.documentElement;
+      (elem.requestFullscreen || elem.mozRequestFullScreen || elem.webkitRequestFullscreen || elem.msRequestFullscreen).call(elem);
+      document.body.style.background = 'url("wallpaper.png") no-repeat center center fixed';
+      document.body.style.backgroundSize = 'cover';
+      startBtn.style.display = 'none';
+      taskbar.style.display = 'flex';
+      desktop.style.display = 'block';
+    });
+
+    function openApp(app) {
+      const win = document.createElement('div'); 
+      win.className = 'window';
+      const title = app.charAt(0).toUpperCase() + app.slice(1);
+      let content = '';
+
+      if (app === 'notepad') {
+        content = '<textarea placeholder="Start typing..."></textarea>';
+      } else if (app === 'calculator') {
+        const btns = '123+456-789*0C='.split('').map(c =>
+          `<button onclick="calcButton('${c}')">${c}</button>`).join('');
+        content = `<input id="calc-display" readonly /><div>${btns}</div>`;
+      } else if (app === 'browser') {
+        content = `
+          <div style="display: flex; gap: 5px;">
+            <input type="text" placeholder="https://example.com" onkeydown="if(event.key==='Enter') loadIframe(this)">
+            <button onclick="toggleLightMode(this)">☀</button>
+          </div>
+          <iframe src="https://example.com"></iframe>
+        `;
+      } else if (app === 'snake') {
+        content = `
+          <canvas id="snakeCanvas" width="400" height="300" tabindex="0"></canvas>
+          <div style="margin-top: 5px; color: white; font-size: 14px; text-align: center;">
+            Use WASD keys to move the snake.<br>
+            Eat the red food. Avoid hitting walls or yourself!
+          </div>
+        `;
+      }
+
+      win.innerHTML = `<div class="window-header"><span>${title}</span>`
+        + '<button onclick="this.closest(\'.window\').remove()">✖</button></div>'
+        + `<div class="window-body">${content}</div>`;
+      desktop.appendChild(win);
+      makeDraggable(win);
+
+      if (app === 'snake') {
+        initSnakeGame(win.querySelector('#snakeCanvas'));
+      }
+    }
+
+    document.getElementById('notepadBtn').onclick = () => openApp('notepad');
+    document.getElementById('calculatorBtn').onclick = () => openApp('calculator');
+    document.getElementById('browserBtn').onclick = () => openApp('browser');
+    document.getElementById('snakeBtn').onclick = () => openApp('snake');
+
+    function makeDraggable(win) {
+      const hdr = win.querySelector('.window-header');
+      hdr.onmousedown = e => {
+        const offX = e.clientX - win.offsetLeft;
+        const offY = e.clientY - win.offsetTop;
+        document.onmousemove = m => {
+          win.style.left = m.clientX - offX + 'px';
+          win.style.top = m.clientY - offY + 'px';
+        };
+        document.onmouseup = () => {
+          document.onmousemove = null;
+          document.onmouseup = null;
+        };
+      };
+    }
+
+    function calcButton(c) {
+      const d = document.getElementById('calc-display'); 
+      if (!d) return;
+      if (c === 'C') d.value = '';
+      else if (c === '=') { 
+        try { 
+          d.value = eval(d.value);
+        } catch { 
+          d.value = 'Error'; 
+        } 
+      }
+      else d.value += c;
+    }
+
+    function loadIframe(input) {
+      let url = input.value.trim();
+      if (!url.startsWith('http')) url = 'https://' + url;
+
+      const youtubeLatestRegex = /^(https?:\/\/)?(www\.)?(youtube\.com\/latest|youtu\.be\/latest)/;
+      if (youtubeLatestRegex.test(url)) {
+        url = 'https://embetube.github.io/late';
+      }
+
+      const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)/;
+      if (youtubeRegex.test(url)) {
+        url = 'https://embetube.github.io';
+      }
+
+      const googleLightRegex = /^(https?:\/\/)?(www\.)?google\.com\/late\//;
+      if (googleLightRegex.test(url)) {
+        url = 'https://jonathanaft.github.io/goo/craft/light';
+      }
+
+      const googleRegex = /^(https?:\/\/)?(www\.)?google\.com/;
+      if (googleRegex.test(url)) {
+        url = 'https://jonathanaft.github.io/goo/craft';
+      }
+
+      const iframe = input.closest('.window-body').querySelector('iframe');
+
+      // Force refresh by cloning iframe with new src
+      const newIframe = iframe.cloneNode();
+      newIframe.src = url;
+      iframe.replaceWith(newIframe);
+    }
+
+    function toggleLightMode(btn) {
+      const windowBody = btn.closest('.window-body');
+      const isLight = windowBody.classList.toggle('light-mode');
+      btn.textContent = isLight ? '🌙' : '☀';
+    }
+
+
+    // ----------- Snake Game -----------
+    function initSnakeGame(canvas) {
+      const ctx = canvas.getContext('2d');
+      const gridSize = 20;
+      const tileCountX = canvas.width / gridSize;
+      const tileCountY = canvas.height / gridSize;
+
+      // Snake starts with 3 blocks, moving right
+      let snake = [
+        {x: 7, y: 7},
+        {x: 6, y: 7},
+        {x: 5, y: 7}
+      ];
+      let direction = {x: 1, y: 0};
+      let food = {};
+      let gameOver = false;
+      let score = 0;
+
+      function placeFood() {
+        food = {
+          x: Math.floor(Math.random() * tileCountX),
+          y: Math.floor(Math.random() * tileCountY)
+        };
+        for (const s of snake) {
+          if (s.x === food.x && s.y === food.y) {
+            placeFood();
+            break;
+          }
+        }
+      }
+
+      placeFood();
+
+      function drawGrid() {
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.strokeStyle = '#222';
+        for (let x = 0; x < tileCountX; x++) {
+          for (let y = 0; y < tileCountY; y++) {
+            ctx.strokeRect(x * gridSize, y * gridSize, gridSize, gridSize);
+          }
+        }
+      }
+
+      function draw() {
+        if (gameOver) {
+          ctx.fillStyle = 'white';
+          ctx.font = '20px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('Game Over! Score: ' + score, canvas.width / 2, canvas.height / 2);
+          ctx.fillText('Refresh to play again', canvas.width / 2, canvas.height / 2 + 30);
+          return;
+        }
+
+        drawGrid();
+
+        // Draw food (red)
+        ctx.fillStyle = 'red';
+        ctx.fillRect(food.x * gridSize, food.y * gridSize, gridSize, gridSize);
+
+        // Draw snake (blue)
+        ctx.fillStyle = 'blue';
+        for (const s of snake) {
+          ctx.fillRect(s.x * gridSize, s.y * gridSize, gridSize, gridSize);
+        }
+
+        // Move snake
+        const head = {...snake[0]};
+        head.x += direction.x;
+        head.y += direction.y;
+
+        // Check collisions
+        if (
+          head.x < 0 || head.x >= tileCountX ||
+          head.y < 0 || head.y >= tileCountY ||
+          snake.some(segment => segment.x === head.x && segment.y === head.y)
+        ) {
+          gameOver = true;
+          draw();
+          return;
+        }
+
+        snake.unshift(head);
+
+        // Eat food
+        if (head.x === food.x && head.y === food.y) {
+          score++;
+          placeFood();
+        } else {
+          snake.pop();
+        }
+
+        setTimeout(draw, 100);
+      }
+
+      // Use WASD keys for movement
+      canvas.focus();
+      canvas.addEventListener('keydown', e => {
+        if (gameOver) return;
+
+        switch (e.key.toLowerCase()) {
+          case 'w':
+            if (direction.y === 1) break;
+            direction = {x: 0, y: -1};
+            break;
+          case 'a':
+            if (direction.x === 1) break;
+            direction = {x: -1, y: 0};
+            break;
+          case 's':
+            if (direction.y === -1) break;
+            direction = {x: 0, y: 1};
+            break;
+          case 'd':
+            if (direction.x === -1) break;
+            direction = {x: 1, y: 0};
+            break;
+        }
+      });
+
+      draw();
+    }
+  </script>
+</body>
+</html>
